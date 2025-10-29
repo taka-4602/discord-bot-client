@@ -1149,16 +1149,25 @@
                 const dmIconClass = this.isDmCollapsed ? 'collapse-icon collapsed' : 'collapse-icon';
 
                 const hasAdmin = (server) => {
-                    let perms;
-                    if (typeof server.permissions === 'string') {
-                        perms = BigInt(server.permissions);
-                    } else {
-                        perms = BigInt(server.permissions || 0);
+                    if (server.isOwner) {
+                        return true;
                     }
                     
-                    const ADMINISTRATOR = BigInt(0x8);
-                    return (perms & ADMINISTRATOR) === ADMINISTRATOR;
+                    if (server.permissions) {
+                        let perms;
+                        if (typeof server.permissions === 'string') {
+                            perms = BigInt(server.permissions);
+                        } else {
+                            perms = BigInt(server.permissions || 0);
+                        }
+                        
+                        const ADMINISTRATOR = BigInt(0x8);
+                        return (perms & ADMINISTRATOR) === ADMINISTRATOR;
+                    }
+                    
+                    return false;
                 };
+
 
                 const adminServers = this.servers.filter(hasAdmin);
                 const otherServers = this.servers.filter(s => !hasAdmin(s));
@@ -1526,10 +1535,36 @@
                         
                     case 'GUILD_CREATE':
                         console.log('GUILD_CREATE受信:', data.name);
+                        const isOwner = data.owner_id === this.user.id;
+                        
+                        let botPermissions = 0n;
+                        
+                        const botMember = data.members?.find(m => m.user?.id === this.user.id);
+                        
+                        if (botMember) {
+                            const everyoneRole = data.roles.find(r => r.id === data.id);
+                            if (everyoneRole) {
+                                botPermissions = BigInt(everyoneRole.permissions);
+                            }
+                            
+                            for (const roleId of botMember.roles) {
+                                const role = data.roles.find(r => r.id === roleId);
+                                if (role) {
+                                    botPermissions |= BigInt(role.permissions);
+                                }
+                            }
+                        }
+                        
+                        data.permissions = botPermissions.toString();
+                        data.isOwner = isOwner;
+                        
                         const existingServer = this.servers.find(s => s.id === data.id);
                         if (!existingServer) {
                             this.servers.push(data);
+                        } else {
+                            Object.assign(existingServer, data);
                         }
+                        
                         if (data.channels) {
                             this.serverChannelsCache[data.id] = data.channels;
                         }
