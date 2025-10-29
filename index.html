@@ -1148,7 +1148,18 @@
                 const dmListClass = this.isDmCollapsed ? 'collapsible-list collapsed' : 'collapsible-list';
                 const dmIconClass = this.isDmCollapsed ? 'collapse-icon collapsed' : 'collapse-icon';
 
-                const hasAdmin = (server) => (server.permissions & 0x8) === 0x8 || (server.permissions & 0x20) === 0x20;
+                const hasAdmin = (server) => {
+                    let perms;
+                    if (typeof server.permissions === 'string') {
+                        perms = BigInt(server.permissions);
+                    } else {
+                        perms = BigInt(server.permissions || 0);
+                    }
+                    
+                    const ADMINISTRATOR = BigInt(0x8);
+                    return (perms & ADMINISTRATOR) === ADMINISTRATOR;
+                };
+
                 const adminServers = this.servers.filter(hasAdmin);
                 const otherServers = this.servers.filter(s => !hasAdmin(s));
 
